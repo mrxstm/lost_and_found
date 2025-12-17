@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">lost_and_found</string>
+    <string name="title_activity_splash_screen">SplashScreen</string>
+    <string name="title_activity_login_screen">LoginScreen</string>
+    <string name="title_activity_signup_screen">SignupScreen</string>
+    <string name="title_activity_dashboard">Dashboard</string>
+    <string name="title_activity_bottom_bar">BottomBar</string>
+    <string name="title_activity_forget_password">ForgetPassword</string>
+</resources>

@@ -1,0 +1,21 @@
+# Android / Gradle
+.gradle/
+**/build/
+.cxx/
+.externalNativeBuild/
+
+# Local config
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Screenshots
+/captures/
+
+# Firebase (optional)
+app/google-services.json
