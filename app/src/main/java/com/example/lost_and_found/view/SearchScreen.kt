@@ -20,18 +20,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,27 +49,35 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.lost_and_found.R
+import com.example.lost_and_found.repository.ItemRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
-import com.example.lost_and_found.view.components.ItemCard
+import com.example.lost_and_found.view.components.ActiveFilterTag
 import com.example.lost_and_found.view.components.FilterChip
+import com.example.lost_and_found.view.components.ItemCard
+import com.example.lost_and_found.viewmodel.ItemViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen() {
 
     val context = LocalContext.current
+    val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
+    // Observe LiveData
+    val allItems by itemViewModel.allItems.observeAsState(emptyList())
+    val isLoading by itemViewModel.isLoading.observeAsState(false)
+
+    // Search & filter states
     var searchQuery by remember { mutableStateOf("") }
     var selectedStatus by remember { mutableStateOf("all") }
-
-    // Filter states — applied only when user taps Apply
     var selectedCategory by remember { mutableStateOf("All") }
     var selectedLocation by remember { mutableStateOf("All") }
 
-    // Temp filter states — inside bottom sheet before applying
+    // Temp states for bottom sheet
     var tempCategory by remember { mutableStateOf("All") }
     var tempLocation by remember { mutableStateOf("All") }
-
     var showFilterSheet by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState()
 
@@ -75,32 +85,31 @@ fun SearchScreen() {
         "All", "Electronics", "Clothing",
         "Accessories", "Documents", "Keys", "Bags", "Others"
     )
-    val locations = listOf(
-        "All", "Block A", "Block B",
-        "Library", "Cafeteria", "Parking Lot", "Gym"
-    )
 
-    // Check if any filter is active
+    // Dynamic locations from fetched items
+    val locations = listOf("All") + (allItems
+        ?.map { it.location }
+        ?.distinct()
+        ?.filter { it.isNotEmpty() }
+        ?: emptyList())
+
     val isFilterActive = selectedCategory != "All" || selectedLocation != "All"
 
-    // Dummy data
-    val allItems = listOf(
-        DummyItem("Headphone", "Block A", "2025-01-01", "lost", ""),
-        DummyItem("Wallet", "Library", "2025-01-03", "lost", ""),
-        DummyItem("Water Bottle", "Cafeteria", "2025-01-05", "found", ""),
-        DummyItem("Keys", "Parking Lot", "2025-01-06", "found", ""),
-        DummyItem("Laptop Bag", "Block B", "2025-01-07", "lost", ""),
-        DummyItem("ID Card", "Gym", "2025-01-08", "found", ""),
-    )
+    // Fetch all items when screen loads
+    LaunchedEffect(Unit) {
+        itemViewModel.getAllItems()
+    }
 
     // Filter logic
-    val filteredItems = allItems.filter { item ->
+    val filteredItems = allItems?.filter { item ->
         val matchesSearch = item.itemName.contains(searchQuery, ignoreCase = true) ||
-                item.location.contains(searchQuery, ignoreCase = true)
+                item.location.contains(searchQuery, ignoreCase = true) ||
+                item.description.contains(searchQuery, ignoreCase = true)
         val matchesStatus = selectedStatus == "all" || item.status == selectedStatus
+        val matchesCategory = selectedCategory == "All" || item.category == selectedCategory
         val matchesLocation = selectedLocation == "All" || item.location == selectedLocation
-        matchesSearch && matchesStatus && matchesLocation
-    }
+        matchesSearch && matchesStatus && matchesCategory && matchesLocation
+    } ?: emptyList()
 
     // Filter Bottom Sheet
     if (showFilterSheet) {
@@ -116,7 +125,6 @@ fun SearchScreen() {
                     .padding(bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -142,7 +150,7 @@ fun SearchScreen() {
                     )
                 }
 
-                // Category
+                // Category chips
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "Category",
@@ -165,7 +173,7 @@ fun SearchScreen() {
                     }
                 }
 
-                // Location
+                // Location chips
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "Location",
@@ -302,7 +310,6 @@ fun SearchScreen() {
                             else Color(0xFF1F2937)
                         )
                         .clickable {
-                            // Sync temp with current before opening
                             tempCategory = selectedCategory
                             tempLocation = selectedLocation
                             showFilterSheet = true
@@ -378,18 +385,8 @@ fun SearchScreen() {
             }
         }
 
-        // Results count
-        item {
-            Text(
-                "${filteredItems.size} item${if (filteredItems.size != 1) "s" else ""} found",
-                color = Color(0xFF9CA3AF),
-                fontSize = 12.sp,
-                fontFamily = Ruluko
-            )
-        }
-
-        // Results grid
-        if (filteredItems.isEmpty()) {
+        // Loading indicator
+        if (isLoading) {
             item {
                 Box(
                     modifier = Modifier
@@ -397,88 +394,91 @@ fun SearchScreen() {
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.search),
-                            contentDescription = null,
-                            tint = Color(0xFF374151),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Text(
-                            "No items found",
-                            color = Color(0xFF9CA3AF),
-                            fontSize = 14.sp,
-                            fontFamily = Ruluko
-                        )
-                    }
+                    CircularProgressIndicator(
+                        color = colorResource(R.color.greenshade)
+                    )
                 }
             }
         } else {
-            items(filteredItems.chunked(2)) { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    rowItems.forEach { item ->
-                        ItemCard(
-                            itemName = item.itemName,
-                            location = item.location,
-                            date = item.date,
-                            status = item.status,
-                            imageUrl = item.imageUrl,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                val intent = Intent(context, ItemDetailActivity::class.java).apply {
-                                    putExtra("itemName", item.itemName)
-                                    putExtra("description", "Some description here")
-                                    putExtra("category", "Electronics")
-                                    putExtra("location", item.location)
-                                    putExtra("date", item.date)
-                                    putExtra("status", item.status)
-                                    putExtra("imageUrl", item.imageUrl)
-                                    putExtra("reporterName", "Jane Doe")
-                                    putExtra("reporterPhotoUrl", "")
-                                    putExtra("isOwner", false)
-                                }
-                                context.startActivity(intent)
-                            }
-                        )
+
+            // Results count
+            item {
+                Text(
+                    "${filteredItems.size} item${if (filteredItems.size != 1) "s" else ""} found",
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 12.sp,
+                    fontFamily = Ruluko
+                )
+            }
+
+            // Results grid
+            if (filteredItems.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.search),
+                                contentDescription = null,
+                                tint = Color(0xFF374151),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text(
+                                "No items found",
+                                color = Color(0xFF9CA3AF),
+                                fontSize = 14.sp,
+                                fontFamily = Ruluko
+                            )
+                        }
                     }
-                    if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
+            } else {
+                items(filteredItems.chunked(2)) { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowItems.forEach { item ->
+                            ItemCard(
+                                itemName = item.itemName,
+                                location = item.location,
+                                date = item.date,
+                                status = item.status,
+                                imageUrl = item.imageUrl,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    val intent = Intent(
+                                        context,
+                                        ItemDetailActivity::class.java
+                                    ).apply {
+                                        putExtra("itemId", item.id)
+                                        putExtra("itemName", item.itemName)
+                                        putExtra("description", item.description)
+                                        putExtra("category", item.category)
+                                        putExtra("location", item.location)
+                                        putExtra("date", item.date)
+                                        putExtra("status", item.status)
+                                        putExtra("imageUrl", item.imageUrl)
+                                        putExtra("reporterName", item.reporterName)
+                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
+                                        putExtra("isOwner", item.reportedBy == currentUserId)
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            )
+                        }
+                        if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
-    }
-}
-
-// Active filter tag with remove button
-@Composable
-fun ActiveFilterTag(label: String, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(Color(0xFF374151))
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 11.sp,
-            fontFamily = Ruluko
-        )
-        Icon(
-            painter = painterResource(R.drawable.baseline_close_24),
-            contentDescription = "Remove filter",
-            tint = Color(0xFF9CA3AF),
-            modifier = Modifier
-                .size(14.dp)
-                .clickable { onRemove() }
-        )
     }
 }
 

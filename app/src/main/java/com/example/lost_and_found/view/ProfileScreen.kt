@@ -1,5 +1,7 @@
 package com.example.lost_and_found.view
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,8 +22,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -29,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -45,29 +52,38 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.AlertDialog
 import coil.compose.AsyncImage
 import com.example.lost_and_found.R
+import com.example.lost_and_found.repository.ItemRepoImpl
+import com.example.lost_and_found.repository.UserRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
 import com.example.lost_and_found.view.components.ClaimCard
 import com.example.lost_and_found.view.components.ConfirmDialog
 import com.example.lost_and_found.view.components.ItemCard
-
-// Dummy claim data class
-data class DummyClaim(
-    val itemName: String,
-    val status: String,
-    val date: String
-)
+import com.example.lost_and_found.viewmodel.ItemViewModel
+import com.example.lost_and_found.viewmodel.UserViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun ProfileScreen() {
 
-    // Dummy user data — will be replaced with Firebase later
-    val userName = "John Doe"
-    val userEmail = "john@example.com"
-    val userRole = "student"
-    val userPhotoUrl = ""
+    val context = LocalContext.current
+    val userViewModel = remember { UserViewModel(UserRepoImpl()) }
+    val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
+    val currentUser = FirebaseAuth.getInstance().currentUser
+
+    // Observe LiveData
+    val userData by userViewModel.users.observeAsState()
+    val userItems by itemViewModel.userItems.observeAsState(emptyList())
+    val isLoading by itemViewModel.isLoading.observeAsState(false)
+
+    // Fetch data when screen loads
+    LaunchedEffect(Unit) {
+        currentUser?.uid?.let {
+            userViewModel.getUserByID(it)
+            itemViewModel.getItemsByUser(it)
+        }
+    }
 
     var selectedTab by remember { mutableStateOf("reports") }
     var selectedReportFilter by remember { mutableStateOf("lost") }
@@ -81,19 +97,6 @@ fun ProfileScreen() {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-
-    // Dummy data
-    val myReports = listOf(
-        DummyItem("Headphone", "Block A", "2025-01-01", "lost", ""),
-        DummyItem("Wallet", "Library", "2025-01-03", "lost", ""),
-        DummyItem("Water Bottle", "Cafeteria", "2025-01-05", "found", ""),
-    )
-
-    val myClaims = listOf(
-        DummyClaim("Laptop Bag", "pending", "2025-01-07"),
-        DummyClaim("ID Card", "approved", "2025-01-08"),
-        DummyClaim("Keys", "rejected", "2025-01-09"),
-    )
 
     val textFieldColors = TextFieldDefaults.colors(
         focusedContainerColor = Color(0xFF374151),
@@ -113,7 +116,13 @@ fun ProfileScreen() {
             title = "Logout",
             message = "Are you sure you want to logout?",
             confirmText = "Logout",
-            onConfirm = { showLogoutDialog = false },
+            onConfirm = {
+                FirebaseAuth.getInstance().signOut()
+                showLogoutDialog = false
+                val intent = Intent(context, LoginScreen::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
+            },
             onDismiss = { showLogoutDialog = false }
         )
     }
@@ -125,12 +134,28 @@ fun ProfileScreen() {
             message = "Are you sure you want to delete your account? This action cannot be undone.",
             confirmText = "Delete",
             isDestructive = true,
-            onConfirm = { showDeleteDialog = false },
+            onConfirm = {
+                currentUser?.uid?.let { userId ->
+                    userViewModel.deleteAccount(userId) { success, msg ->
+                        if (success) {
+                            FirebaseAuth.getInstance().currentUser?.delete()
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            val intent = Intent(context, LoginScreen::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                    Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            context.startActivity(intent)
+                        } else {
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                showDeleteDialog = false
+            },
             onDismiss = { showDeleteDialog = false }
         )
     }
 
-    // Change Password Dialog — kept as AlertDialog since it has custom fields
+    // Change Password Dialog
     if (showChangePasswordDialog) {
         AlertDialog(
             onDismissRequest = { showChangePasswordDialog = false },
@@ -171,7 +196,68 @@ fun ProfileScreen() {
             },
             confirmButton = {
                 Button(
-                    onClick = { showChangePasswordDialog = false },
+                    onClick = {
+                        when {
+                            currentPassword.isEmpty() -> {
+                                Toast.makeText(
+                                    context,
+                                    "Please enter current password",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            newPassword.isEmpty() -> {
+                                Toast.makeText(
+                                    context,
+                                    "Please enter new password",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            newPassword != confirmPassword -> {
+                                Toast.makeText(
+                                    context,
+                                    "Passwords do not match",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            else -> {
+                                val credential =
+                                    com.google.firebase.auth.EmailAuthProvider.getCredential(
+                                        currentUser?.email ?: "", currentPassword
+                                    )
+                                currentUser?.reauthenticate(credential)
+                                    ?.addOnCompleteListener { reauth ->
+                                        if (reauth.isSuccessful) {
+                                            currentUser.updatePassword(newPassword)
+                                                .addOnCompleteListener { update ->
+                                                    if (update.isSuccessful) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Password updated successfully",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        showChangePasswordDialog = false
+                                                        currentPassword = ""
+                                                        newPassword = ""
+                                                        confirmPassword = ""
+                                                    } else {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Failed: ${update.exception?.message}",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Current password is incorrect",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                            }
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorResource(R.color.greenshade),
                         contentColor = Color.Black
@@ -208,9 +294,9 @@ fun ProfileScreen() {
             ) {
                 // Avatar
                 Box(contentAlignment = Alignment.BottomEnd) {
-                    if (userPhotoUrl.isNotEmpty()) {
+                    if (userData?.profilePhotoURL?.isNotEmpty() == true) {
                         AsyncImage(
-                            model = userPhotoUrl,
+                            model = userData?.profilePhotoURL,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -256,7 +342,7 @@ fun ProfileScreen() {
 
                 // Name
                 Text(
-                    text = userName,
+                    text = userData?.full_name ?: "Loading...",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
@@ -265,7 +351,7 @@ fun ProfileScreen() {
 
                 // Email
                 Text(
-                    text = userEmail,
+                    text = userData?.email ?: "",
                     color = Color(0xFF9CA3AF),
                     fontSize = 13.sp,
                     fontFamily = Ruluko
@@ -276,14 +362,14 @@ fun ProfileScreen() {
                     modifier = Modifier
                         .clip(RoundedCornerShape(50.dp))
                         .background(
-                            if (userRole == "admin") Color(0xFF7C3AED)
+                            if (userData?.role == "admin") Color(0xFF7C3AED)
                             else colorResource(R.color.greenshade).copy(alpha = 0.2f)
                         )
                         .padding(horizontal = 14.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = userRole.replaceFirstChar { it.uppercase() },
-                        color = if (userRole == "admin") Color.White
+                        text = userData?.role?.replaceFirstChar { it.uppercase() } ?: "User",
+                        color = if (userData?.role == "admin") Color.White
                         else colorResource(R.color.greenshade),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -295,7 +381,6 @@ fun ProfileScreen() {
 
                 // Action buttons row
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-
                     // Change Password
                     OutlinedButton(
                         onClick = { showChangePasswordDialog = true },
@@ -355,7 +440,7 @@ fun ProfileScreen() {
             }
         }
 
-        // Tabs — My Reports / My Claims
+        // Tabs
         item {
             Row(
                 modifier = Modifier
@@ -418,7 +503,8 @@ fun ProfileScreen() {
                         ) {
                             Text(
                                 text = filter.replaceFirstChar { it.uppercase() },
-                                color = if (selectedReportFilter == filter) Color.Black else Color.White,
+                                color = if (selectedReportFilter == filter) Color.Black
+                                else Color.White,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp,
                                 fontFamily = Ruluko
@@ -429,11 +515,8 @@ fun ProfileScreen() {
                 Spacer(Modifier.height(12.dp))
             }
 
-
-            // Reports grid
-            val filteredReports = myReports.filter { it.status == selectedReportFilter }
-
-            if (filteredReports.isEmpty()) {
+            // Loading indicator
+            if (isLoading) {
                 item {
                     Box(
                         modifier = Modifier
@@ -441,63 +524,90 @@ fun ProfileScreen() {
                             .height(150.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "No $selectedReportFilter items reported",
-                            color = Color(0xFF9CA3AF),
-                            fontFamily = Ruluko,
-                            fontSize = 13.sp
+                        CircularProgressIndicator(
+                            color = colorResource(R.color.greenshade)
                         )
                     }
                 }
             } else {
-                items(filteredReports.chunked(2)) { rowItems ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowItems.forEach { item ->
-                            ItemCard(
-                                itemName = item.itemName,
-                                location = item.location,
-                                date = item.date,
-                                status = item.status,
-                                imageUrl = item.imageUrl,
-                                modifier = Modifier.weight(1f)
+                val filteredReports = userItems
+                    ?.filter { it.status == selectedReportFilter }
+                    ?: emptyList()
+
+                if (filteredReports.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No $selectedReportFilter items reported",
+                                color = Color(0xFF9CA3AF),
+                                fontFamily = Ruluko,
+                                fontSize = 13.sp
                             )
                         }
-                        if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                } else {
+                    items(filteredReports.chunked(2)) { rowItems ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowItems.forEach { item ->
+                                ItemCard(
+                                    itemName = item.itemName,
+                                    location = item.location,
+                                    date = item.date,
+                                    status = item.status,
+                                    imageUrl = item.imageUrl,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val intent = Intent(
+                                            context,
+                                            ItemDetailActivity::class.java
+                                        ).apply {
+                                            putExtra("itemId", item.id)
+                                            putExtra("itemName", item.itemName)
+                                            putExtra("description", item.description)
+                                            putExtra("category", item.category)
+                                            putExtra("location", item.location)
+                                            putExtra("date", item.date)
+                                            putExtra("status", item.status)
+                                            putExtra("imageUrl", item.imageUrl)
+                                            putExtra("reporterName", item.reporterName)
+                                            putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
+                                            putExtra("isOwner", true) // always owner in my reports
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
+                            if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
         }
 
-        // My Claims Tab
+        // My Claims Tab — will connect when Claims CRUD is done
         if (selectedTab == "claims") {
-            if (myClaims.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "No claims submitted yet",
-                            color = Color(0xFF9CA3AF),
-                            fontFamily = Ruluko,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            } else {
-                items(myClaims) { claim ->
-                    ClaimCard(
-                        itemName = claim.itemName,
-                        status = claim.status,
-                        date = claim.date,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Claims coming soon...",
+                        color = Color(0xFF9CA3AF),
+                        fontFamily = Ruluko,
+                        fontSize = 13.sp
                     )
                 }
             }

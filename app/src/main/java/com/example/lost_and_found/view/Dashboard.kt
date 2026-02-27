@@ -1,7 +1,9 @@
 package com.example.lost_and_found.view
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
@@ -29,23 +31,49 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.fontResource
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.lost_and_found.R
 import com.example.lost_and_found.ui.theme.Sniglet
+import com.example.lost_and_found.utils.ImageUtils
 import com.example.lost_and_found.view.ui.theme.Lost_and_foundTheme
 
 class Dashboard : ComponentActivity() {
+
+    private lateinit var imageUtils: ImageUtils
+    private var onImageSelected: ((Uri?) -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(
+                ContextCompat.getColor(this, R.color.blackshade)
+            ),
+            navigationBarStyle = SystemBarStyle.dark(
+                ContextCompat.getColor(this, R.color.blackshade)
+            )
+        )
+
+        // Initialize ImageUtils here in the Activity
+        imageUtils = ImageUtils(this, this)
+        imageUtils.registerLaunchers { uri ->
+            onImageSelected?.invoke(uri)
+        }
+
         setContent {
             Lost_and_foundTheme {
-              DashboardBody()
+                DashboardBody(
+                    onPickImage = { callback ->
+                        onImageSelected = callback
+                        imageUtils.launchImagePicker()
+                    },
+                    onTakePhoto = { callback ->
+                        onImageSelected = callback
+                        imageUtils.launchCamera()
+                    }
+                )
             }
         }
     }
@@ -53,9 +81,11 @@ class Dashboard : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardBody() {
-
-    data class NavItem(val label: String, val icon:Int)
+fun DashboardBody(
+    onPickImage: (callback: (Uri?) -> Unit) -> Unit = {},
+    onTakePhoto: (callback: (Uri?) -> Unit) -> Unit = {}
+) {
+    data class NavItem(val label: String, val icon: Int)
 
     var selectedIndex by remember { mutableStateOf(0) }
 
@@ -75,7 +105,6 @@ fun DashboardBody() {
                     titleContentColor = Color.Black,
                     containerColor = colorResource(R.color.blackshade)
                 ),
-
                 navigationIcon = {
                     Row {
                         Image(
@@ -85,7 +114,13 @@ fun DashboardBody() {
                         Spacer(Modifier.width(40.dp))
                     }
                 },
-                title = {Text("Lost&Found", fontFamily = Sniglet, color = colorResource(R.color.greenshade))},
+                title = {
+                    Text(
+                        "Lost&Found",
+                        fontFamily = Sniglet,
+                        color = colorResource(R.color.greenshade)
+                    )
+                },
                 actions = {
                     IconButton(onClick = {}) {
                         Icon(
@@ -100,16 +135,14 @@ fun DashboardBody() {
                         )
                     }
                 }
-
             )
-
         },
         bottomBar = {
             NavigationBar(
                 containerColor = colorResource(R.color.blackshade),
                 tonalElevation = 0.dp
             ) {
-                listItems.forEachIndexed{ index, item ->
+                listItems.forEachIndexed { index, item ->
                     NavigationBarItem(
                         icon = {
                             Icon(
@@ -117,35 +150,33 @@ fun DashboardBody() {
                                 contentDescription = null,
                             )
                         },
-                        label = {
-                            Text(item.label)
-                        },
-                        onClick = {
-                            selectedIndex = index
-                        },
+                        label = { Text(item.label) },
+                        onClick = { selectedIndex = index },
                         selected = selectedIndex == index,
-
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = colorResource(R.color.greenshade),
                             selectedTextColor = colorResource(R.color.greenshade),
                             unselectedIconColor = colorResource(R.color.navbuttoncolor),
                             unselectedTextColor = colorResource(R.color.navbuttoncolor),
-
                             indicatorColor = Color.Transparent
                         )
                     )
-
                 }
             }
         }
     ) { padding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            when(selectedIndex) {
+            when (selectedIndex) {
                 0 -> HomeScreen()
                 1 -> SearchScreen()
-                2 -> ReportScreen()
+                2 -> ReportScreen(
+                    onPickImage = onPickImage,
+                    onTakePhoto = onTakePhoto
+                )
                 3 -> ProfileScreen()
                 else -> HomeScreen()
             }

@@ -1,8 +1,7 @@
 package com.example.lost_and_found.view
 
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -36,7 +36,9 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,23 +56,59 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.lost_and_found.R
+import com.example.lost_and_found.model.ItemModel
+import com.example.lost_and_found.repository.CloudinaryRepoImpl
+import com.example.lost_and_found.repository.ItemRepoImpl
+import com.example.lost_and_found.repository.UserRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
+import com.example.lost_and_found.viewmodel.CloudinaryViewModel
+import com.example.lost_and_found.viewmodel.ItemViewModel
+import com.example.lost_and_found.viewmodel.UserViewModel
+import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportScreen() {
+fun ReportScreen(
+    preSelectedStatus: String = "lost",
+    onPickImage: (callback: (Uri?) -> Unit) -> Unit = {},
+    onTakePhoto: (callback: (Uri?) -> Unit) -> Unit = {},
+    isEditMode: Boolean = false,
+    itemId: String = "",
+    prefillName: String = "",
+    prefillDescription: String = "",
+    prefillLocation: String = "",
+    prefillCategory: String = "",
+    prefillDate: String = "",
+    prefillImageUrl: String = "",
+) {
+    var isUploading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    // ViewModels
+    val cloudinaryViewModel = remember { CloudinaryViewModel(CloudinaryRepoImpl()) }
+    val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
+    val userViewModel = remember { UserViewModel(UserRepoImpl()) }
+
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val userData by userViewModel.users.observeAsState()
+
+    LaunchedEffect(Unit) {
+        currentUser?.uid?.let { userViewModel.getUserByID(it) }
+    }
 
     // Form states
-    var itemName by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("") }
-    var selectedStatus by remember { mutableStateOf("lost") }
-    var selectedDate by remember { mutableStateOf("") }
+    var itemName by remember { mutableStateOf(prefillName) }
+    var description by remember { mutableStateOf(prefillDescription) }
+    var location by remember { mutableStateOf(prefillLocation) }
+    var selectedCategory by remember { mutableStateOf(prefillCategory) }
+    var selectedStatus by remember { mutableStateOf(preSelectedStatus) }
+    var selectedDate by remember { mutableStateOf(prefillDate) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var existingImageRemoved by remember { mutableStateOf(false) }
 
     // UI states
     var categoryExpanded by remember { mutableStateOf(false) }
@@ -92,18 +131,6 @@ fun ReportScreen() {
         focusedLabelColor = colorResource(R.color.greenshade),
         unfocusedLabelColor = Color(0xFF9CA3AF),
     )
-
-    // Gallery launcher
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri -> selectedImageUri = uri }
-
-    // Camera launcher
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        // bitmap returned — convert to URI if needed
-    }
 
     // Date picker state
     val datePickerState = rememberDatePickerState()
@@ -161,8 +188,8 @@ fun ReportScreen() {
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF374151))
                         .clickable {
-                            galleryLauncher.launch("image/*")
                             showImageBottomSheet = false
+                            onPickImage { uri -> selectedImageUri = uri }
                         }
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -184,8 +211,8 @@ fun ReportScreen() {
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF374151))
                         .clickable {
-                            cameraLauncher.launch(null)
                             showImageBottomSheet = false
+                            onTakePhoto { uri -> selectedImageUri = uri }
                         }
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -217,14 +244,14 @@ fun ReportScreen() {
         // Title
         item {
             Text(
-                "Report Item",
+                if (isEditMode) "Edit Item" else "Report Item",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = Ruluko
             )
             Text(
-                "Fill in the details of the item",
+                if (isEditMode) "Update the item details" else "Fill in the details of the item",
                 color = Color(0xFF9CA3AF),
                 fontSize = 12.sp,
                 fontFamily = Ruluko
@@ -268,7 +295,6 @@ fun ReportScreen() {
         }
 
         // Image Upload
-        // Image Upload
         item {
             Box(
                 modifier = Modifier
@@ -281,11 +307,14 @@ fun ReportScreen() {
                         color = Color(0xFF374151),
                         shape = RoundedCornerShape(16.dp)
                     )
-                    .clickable { if (selectedImageUri == null) showImageBottomSheet = true },
+                    .clickable {
+                        if (selectedImageUri == null && (!isEditMode || existingImageRemoved)) {
+                            showImageBottomSheet = true
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (selectedImageUri != null) {
-                    // Image preview
                     AsyncImage(
                         model = selectedImageUri,
                         contentDescription = null,
@@ -294,24 +323,15 @@ fun ReportScreen() {
                             .fillMaxSize()
                             .clip(RoundedCornerShape(16.dp))
                     )
-                    // Cross/Remove button on top right
-                    Box(
+                } else if (isEditMode && prefillImageUrl.isNotEmpty() && !existingImageRemoved) {
+                    AsyncImage(
+                        model = prefillImageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(50.dp))
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable { selectedImageUri = null },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.baseline_close_24),
-                            contentDescription = "Remove image",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                    )
                 } else {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -328,6 +348,30 @@ fun ReportScreen() {
                             color = Color(0xFF9CA3AF),
                             fontSize = 13.sp,
                             fontFamily = Ruluko
+                        )
+                    }
+                }
+
+                // Remove button
+                if (selectedImageUri != null || (isEditMode && prefillImageUrl.isNotEmpty() && !existingImageRemoved)) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable {
+                                selectedImageUri = null
+                                existingImageRemoved = true
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_close_24),
+                            contentDescription = "Remove image",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -449,7 +493,121 @@ fun ReportScreen() {
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
-                    // Submit logic will go here
+                    when {
+                        itemName.isEmpty() -> {
+                            Toast.makeText(context, "Please enter item name", Toast.LENGTH_SHORT).show()
+                        }
+                        description.isEmpty() -> {
+                            Toast.makeText(context, "Please enter description", Toast.LENGTH_SHORT).show()
+                        }
+                        location.isEmpty() -> {
+                            Toast.makeText(context, "Please enter location", Toast.LENGTH_SHORT).show()
+                        }
+                        selectedCategory.isEmpty() -> {
+                            Toast.makeText(context, "Please select a category", Toast.LENGTH_SHORT).show()
+                        }
+                        selectedDate.isEmpty() -> {
+                            Toast.makeText(context, "Please select a date", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            isUploading = true
+                            if (selectedImageUri != null) {
+                                // New image — upload to Cloudinary first
+                                cloudinaryViewModel.uploadImage(
+                                    context,
+                                    selectedImageUri!!
+                                ) { imageUrl ->
+                                    if (imageUrl != null) {
+                                        val item = ItemModel(
+                                            id = itemId,
+                                            itemName = itemName,
+                                            description = description,
+                                            category = selectedCategory,
+                                            location = location,
+                                            status = selectedStatus,
+                                            imageUrl = imageUrl,
+                                            reportedBy = currentUser?.uid ?: "",
+                                            reporterName = userData?.full_name ?: "",
+                                            reporterPhotoUrl = userData?.profilePhotoURL ?: "",
+                                            date = selectedDate,
+                                            createdAt = System.currentTimeMillis()
+                                        )
+                                        if (isEditMode) {
+                                            itemViewModel.updateItem(itemId, item) { success, msg ->
+                                                isUploading = false
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                if (success) {
+                                                    (context as? android.app.Activity)?.finish()
+                                                }
+                                            }
+                                        } else {
+                                            itemViewModel.addItem(item) { success, msg ->
+                                                isUploading = false
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                if (success) {
+                                                    itemName = ""
+                                                    description = ""
+                                                    location = ""
+                                                    selectedCategory = ""
+                                                    selectedDate = ""
+                                                    selectedImageUri = null
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        isUploading = false
+                                        Toast.makeText(
+                                            context,
+                                            "Image upload failed",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            } else {
+                                // No new image
+                                val item = ItemModel(
+                                    id = itemId,
+                                    itemName = itemName,
+                                    description = description,
+                                    category = selectedCategory,
+                                    location = location,
+                                    status = selectedStatus,
+                                    imageUrl = when {
+                                        existingImageRemoved -> ""
+                                        isEditMode -> prefillImageUrl
+                                        else -> ""
+                                    },
+                                    reportedBy = currentUser?.uid ?: "",
+                                    reporterName = userData?.full_name ?: "",
+                                    reporterPhotoUrl = userData?.profilePhotoURL ?: "",
+                                    date = selectedDate,
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                if (isEditMode) {
+                                    itemViewModel.updateItem(itemId, item) { success, msg ->
+                                        isUploading = false
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        if (success) {
+                                            (context as? android.app.Activity)?.finish()
+                                        }
+                                    }
+                                } else {
+                                    itemViewModel.addItem(item) { success, msg ->
+                                        isUploading = false
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        if (success) {
+                                            itemName = ""
+                                            description = ""
+                                            location = ""
+                                            selectedCategory = ""
+                                            selectedDate = ""
+                                            selectedImageUri = null
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -458,14 +616,30 @@ fun ReportScreen() {
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colorResource(R.color.greenshade),
                     contentColor = Color.Black
-                )
+                ),
+                enabled = !isUploading
             ) {
-                Text(
-                    "Submit Report",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    fontFamily = Ruluko
-                )
+                if (isUploading) {
+                    CircularProgressIndicator(
+                        color = Color.Black,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Uploading...",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        fontFamily = Ruluko
+                    )
+                } else {
+                    Text(
+                        if (isEditMode) "Update Item" else "Submit Report",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        fontFamily = Ruluko
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
