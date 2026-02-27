@@ -1,5 +1,6 @@
 package com.example.lost_and_found.view
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +54,8 @@ import com.example.lost_and_found.view.components.FilterChip
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen() {
+
+    val context = LocalContext.current
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedStatus by remember { mutableStateOf("all") }
@@ -425,7 +429,22 @@ fun SearchScreen() {
                             date = item.date,
                             status = item.status,
                             imageUrl = item.imageUrl,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                val intent = Intent(context, ItemDetailActivity::class.java).apply {
+                                    putExtra("itemName", item.itemName)
+                                    putExtra("description", "Some description here")
+                                    putExtra("category", "Electronics")
+                                    putExtra("location", item.location)
+                                    putExtra("date", item.date)
+                                    putExtra("status", item.status)
+                                    putExtra("imageUrl", item.imageUrl)
+                                    putExtra("reporterName", "Jane Doe")
+                                    putExtra("reporterPhotoUrl", "")
+                                    putExtra("isOwner", false)
+                                }
+                                context.startActivity(intent)
+                            }
                         )
                     }
                     if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))

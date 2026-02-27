@@ -1,6 +1,7 @@
 package com.example.lost_and_found.view.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +38,8 @@ fun ItemCard(
     date: String,
     status: String,        // "lost" or "found"
     imageUrl: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val statusColor = if (status.lowercase() == "lost")
         Color(0xFFEF4444)   // red
@@ -51,6 +53,8 @@ fun ItemCard(
             .width(175.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF1F2937))
+            .clickable { onClick() }   // 👈 add this
+
     ) {
         Column {
 

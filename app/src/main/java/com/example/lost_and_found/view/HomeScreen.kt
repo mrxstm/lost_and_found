@@ -1,5 +1,6 @@
 package com.example.lost_and_found.view
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +57,7 @@ val dummyItems = listOf(
 
 @Composable
 fun HomeScreen() {
+    val context = LocalContext.current
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -175,7 +178,22 @@ fun HomeScreen() {
                         location = item.location,
                         date = item.date,
                         status = item.status,
-                        imageUrl = item.imageUrl
+                        imageUrl = item.imageUrl,
+                        onClick = {
+                            val intent = Intent(context, ItemDetailActivity::class.java).apply {
+                                putExtra("itemName", item.itemName)
+                                putExtra("description", "Some description here")
+                                putExtra("category", "Electronics")
+                                putExtra("location", item.location)
+                                putExtra("date", item.date)
+                                putExtra("status", item.status)
+                                putExtra("imageUrl", item.imageUrl)
+                                putExtra("reporterName", "Jane Doe")
+                                putExtra("reporterPhotoUrl", "")
+                                putExtra("isOwner", false)
+                            }
+                            context.startActivity(intent)
+                        }
                     )
                 }
             }
