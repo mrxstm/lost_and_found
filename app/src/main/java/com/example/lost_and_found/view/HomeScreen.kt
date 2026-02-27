@@ -3,6 +3,7 @@ package com.example.lost_and_found.view
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,10 +20,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,34 +36,37 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.lost_and_found.R
+import com.example.lost_and_found.repository.ItemRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
 import com.example.lost_and_found.view.components.ItemCard
 import com.example.lost_and_found.view.components.SectionHeader
 import com.example.lost_and_found.view.components.StatCard
-
-// Dummy data class for preview
-data class DummyItem(
-    val itemName: String,
-    val location: String,
-    val date: String,
-    val status: String,
-    val imageUrl: String
-)
-
-val dummyItems = listOf(
-    DummyItem("Headphone", "Block A", "2025-01-01", "lost", ""),
-    DummyItem("Wallet", "Library", "2025-01-03", "lost", ""),
-    DummyItem("Water Bottle", "Cafeteria", "2025-01-05", "found", ""),
-    DummyItem("Keys", "Parking Lot", "2025-01-06", "found", ""),
-)
+import com.example.lost_and_found.viewmodel.ItemViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun HomeScreen() {
+
     val context = LocalContext.current
+    val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+    // Observe LiveData
+    val allItems by itemViewModel.allItems.observeAsState(emptyList())
+    val isLoading by itemViewModel.isLoading.observeAsState(false)
+
+    // Fetch all items when screen loads
+    LaunchedEffect(Unit) {
+        itemViewModel.getAllItems()
+    }
+
+    // Filter lost and found items
+    val lostItems = allItems?.filter { it.status == "lost" } ?: emptyList()
+    val foundItems = allItems?.filter { it.status == "found" } ?: emptyList()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -74,7 +83,12 @@ fun HomeScreen() {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(context, ReportActivity::class.java).apply {
+                            putExtra("status", "lost")
+                        }
+                        context.startActivity(intent)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(44.dp),
@@ -97,7 +111,12 @@ fun HomeScreen() {
                 }
 
                 Button(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(context, ReportActivity::class.java).apply {
+                            putExtra("status", "found")
+                        }
+                        context.startActivity(intent)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(44.dp),
@@ -122,7 +141,7 @@ fun HomeScreen() {
             }
         }
 
-        // Info section
+        // Info / Stats section
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -138,20 +157,20 @@ fun HomeScreen() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     StatCard(
-                        value = "2,000",
-                        label = "Total report",
+                        value = "${allItems?.size ?: 0}",
+                        label = "Total Items",
                         icon = R.drawable.outline_content_paste_24,
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        value = "1,500",
+                        value = "${foundItems.size}",
                         label = "Item returned",
                         icon = R.drawable.outline_assignment_return_24,
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        value = "150",
-                        label = "Active Users",
+                        value = "${lostItems.size}",
+                        label = "Lost Items",
                         icon = R.drawable.account,
                         modifier = Modifier.weight(1f)
                     )
@@ -165,63 +184,129 @@ fun HomeScreen() {
             }
         }
 
-        // Recently Lost
-        item {
-            SectionHeader(title = "Recently Lost", onSeeAll = {})
-            Spacer(Modifier.height(10.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(dummyItems.filter { it.status == "lost" }) { item ->
-                    ItemCard(
-                        itemName = item.itemName,
-                        location = item.location,
-                        date = item.date,
-                        status = item.status,
-                        imageUrl = item.imageUrl,
-                        onClick = {
-                            val intent = Intent(context, ItemDetailActivity::class.java).apply {
-                                putExtra("itemName", item.itemName)
-                                putExtra("description", "Some description here")
-                                putExtra("category", "Electronics")
-                                putExtra("location", item.location)
-                                putExtra("date", item.date)
-                                putExtra("status", item.status)
-                                putExtra("imageUrl", item.imageUrl)
-                                putExtra("reporterName", "Jane Doe")
-                                putExtra("reporterPhotoUrl", "")
-                                putExtra("isOwner", false)
-                            }
-                            context.startActivity(intent)
-                        }
+        // Loading indicator
+        if (isLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = colorResource(R.color.greenshade)
                     )
                 }
             }
-        }
+        } else {
 
-        // Recently Found
-        item {
-            SectionHeader(title = "Recently Found", onSeeAll = {})
-            Spacer(Modifier.height(10.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(dummyItems.filter { it.status == "found" }) { item ->
-                    ItemCard(
-                        itemName = item.itemName,
-                        location = item.location,
-                        date = item.date,
-                        status = item.status,
-                        imageUrl = item.imageUrl
-                    )
+            // Recently Lost
+            item {
+                SectionHeader(title = "Recently Lost", onSeeAll = {})
+                Spacer(Modifier.height(10.dp))
+                if (lostItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No lost items reported yet",
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 13.sp,
+                            fontFamily = Ruluko
+                        )
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(lostItems) { item ->
+                            ItemCard(
+                                itemName = item.itemName,
+                                location = item.location,
+                                date = item.date,
+                                status = item.status,
+                                imageUrl = item.imageUrl,
+                                onClick = {
+                                    val intent = Intent(
+                                        context,
+                                        ItemDetailActivity::class.java
+                                    ).apply {
+                                        putExtra("itemId", item.id)
+                                        putExtra("itemName", item.itemName)
+                                        putExtra("description", item.description)
+                                        putExtra("category", item.category)
+                                        putExtra("location", item.location)
+                                        putExtra("date", item.date)
+                                        putExtra("status", item.status)
+                                        putExtra("imageUrl", item.imageUrl)
+                                        putExtra("reporterName", item.reporterName)
+                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
+                                        putExtra("isOwner", item.reportedBy == currentUserId)
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Recently Found
+            item {
+                SectionHeader(title = "Recently Found", onSeeAll = {})
+                Spacer(Modifier.height(10.dp))
+                if (foundItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No found items reported yet",
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 13.sp,
+                            fontFamily = Ruluko
+                        )
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(foundItems) { item ->
+                            ItemCard(
+                                itemName = item.itemName,
+                                location = item.location,
+                                date = item.date,
+                                status = item.status,
+                                imageUrl = item.imageUrl,
+                                onClick = {
+                                    val intent = Intent(
+                                        context,
+                                        ItemDetailActivity::class.java
+                                    ).apply {
+                                        putExtra("itemId", item.id)
+                                        putExtra("itemName", item.itemName)
+                                        putExtra("description", item.description)
+                                        putExtra("category", item.category)
+                                        putExtra("location", item.location)
+                                        putExtra("date", item.date)
+                                        putExtra("status", item.status)
+                                        putExtra("imageUrl", item.imageUrl)
+                                        putExtra("reporterName", item.reporterName)
+                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
+                                        putExtra("isOwner", item.reportedBy == currentUserId)
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    HomeScreen()
 }
