@@ -92,6 +92,7 @@ fun ItemDetailScreen(
     onPickImage: (callback: (Uri?) -> Unit) -> Unit = {},
     onTakePhoto: (callback: (Uri?) -> Unit) -> Unit = {},
     claimViewModel: ClaimViewModel = remember { ClaimViewModel(ClaimRepoImpl()) },
+    reportedBy: String = "",
 ) {
     val context = LocalContext.current
     val currentUser = FirebaseAuth.getInstance().currentUser
@@ -316,6 +317,7 @@ fun ItemDetailScreen(
                                     itemId = itemId,
                                     itemName = itemName,
                                     claimantId = currentUser?.uid ?: "",
+                                    founderId = reportedBy,
                                     claimantName = userData?.full_name ?: "",
                                     claimantPhotoUrl = userData?.profilePhotoURL ?: "",
                                     message = actionMessage,

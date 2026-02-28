@@ -1,6 +1,7 @@
 package com.example.lost_and_found.view
 
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -26,12 +27,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,52 +59,72 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.lost_and_found.R
 import com.example.lost_and_found.model.UserModel
+import com.example.lost_and_found.repository.ClaimRepoImpl
+import com.example.lost_and_found.repository.CloudinaryRepoImpl
 import com.example.lost_and_found.repository.ItemRepoImpl
 import com.example.lost_and_found.repository.UserRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
 import com.example.lost_and_found.view.components.ClaimCard
 import com.example.lost_and_found.view.components.ConfirmDialog
 import com.example.lost_and_found.view.components.ItemCard
+import com.example.lost_and_found.viewmodel.ClaimViewModel
+import com.example.lost_and_found.viewmodel.CloudinaryViewModel
 import com.example.lost_and_found.viewmodel.ItemViewModel
 import com.example.lost_and_found.viewmodel.UserViewModel
 import com.google.firebase.auth.FirebaseAuth
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
-
+fun ProfileScreen(
+    onPickImage: (callback: (Uri?) -> Unit) -> Unit = {},
+    onTakePhoto: (callback: (Uri?) -> Unit) -> Unit = {},
+) {
     val context = LocalContext.current
     val userViewModel = remember { UserViewModel(UserRepoImpl()) }
     val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
+    val claimViewModel = remember { ClaimViewModel(ClaimRepoImpl()) }
+    val cloudinaryViewModel = remember { CloudinaryViewModel(CloudinaryRepoImpl()) }
     val currentUser = FirebaseAuth.getInstance().currentUser
-    var showEditProfileDialog by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf("") }
-    var editPhone by remember { mutableStateOf("") }
 
-    // Observe LiveData
+    // ─── Observe LiveData ─────────────────────────────────────────────────────
     val userData by userViewModel.users.observeAsState()
     val userItems by itemViewModel.userItems.observeAsState(emptyList())
     val isLoading by itemViewModel.isLoading.observeAsState(false)
+    val userClaims by claimViewModel.userClaims.observeAsState(emptyList())
+    val founderClaims by claimViewModel.founderClaims.observeAsState(emptyList())
+    val isClaimsLoading by claimViewModel.isLoading.observeAsState(false)
 
-    // Fetch data when screen loads
+    // ─── Fetch data ───────────────────────────────────────────────────────────
     LaunchedEffect(Unit) {
-        currentUser?.uid?.let {
-            userViewModel.getUserByID(it)
-            itemViewModel.getItemsByUser(it)
+        currentUser?.uid?.let { uid ->
+            userViewModel.getUserByID(uid)
+            itemViewModel.getItemsByUser(uid)
+            claimViewModel.getClaimsByUser(uid)
+            claimViewModel.getClaimsByFounder(uid)
         }
     }
 
+    // ─── UI states ────────────────────────────────────────────────────────────
     var selectedTab by remember { mutableStateOf("reports") }
     var selectedReportFilter by remember { mutableStateOf("lost") }
+    var selectedClaimFilter by remember { mutableStateOf("received") }
 
-    // Dialog states
-    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
+    var showImageSheet by remember { mutableStateOf(false) }
+    var isUploadingPhoto by remember { mutableStateOf(false) }
 
-    // Change password states
+    var editName by remember { mutableStateOf("") }
+    var editPhone by remember { mutableStateOf("") }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+
+    val imageSheetState = rememberModalBottomSheetState()
 
     val textFieldColors = TextFieldDefaults.colors(
         focusedContainerColor = Color(0xFF374151),
@@ -114,24 +138,156 @@ fun ProfileScreen() {
         unfocusedLabelColor = Color(0xFF9CA3AF),
     )
 
-    // Logout Dialog
-    if (showLogoutDialog) {
-        ConfirmDialog(
-            title = "Logout",
-            message = "Are you sure you want to logout?",
-            confirmText = "Logout",
-            onConfirm = {
-                FirebaseAuth.getInstance().signOut()
-                showLogoutDialog = false
-                val intent = Intent(context, LoginScreen::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                context.startActivity(intent)
-            },
-            onDismiss = { showLogoutDialog = false }
-        )
+    // ─── Date formatter ───────────────────────────────────────────────────────
+    val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    // ─── Profile picture bottom sheet ─────────────────────────────────────────
+    if (showImageSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showImageSheet = false },
+            sheetState = imageSheetState,
+            containerColor = Color(0xFF1F2937)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Update Profile Photo",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    fontFamily = Ruluko
+                )
+
+                // Gallery option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF374151))
+                        .clickable {
+                            showImageSheet = false
+                            onPickImage { uri ->
+                                if (uri != null) {
+                                    isUploadingPhoto = true
+                                    cloudinaryViewModel.uploadImage(context, uri) { uploadedUrl ->
+                                        if (uploadedUrl != null) {
+                                            val updatedModel = UserModel(
+                                                id = currentUser?.uid ?: "",
+                                                full_name = userData?.full_name ?: "",
+                                                email = userData?.email ?: "",
+                                                phone = userData?.phone ?: "",
+                                                profilePhotoURL = uploadedUrl,
+                                                role = userData?.role ?: "user"
+                                            )
+                                            currentUser?.uid?.let { uid ->
+                                                userViewModel.editProfile(
+                                                    uid,
+                                                    updatedModel
+                                                ) { success, msg ->
+                                                    isUploadingPhoto = false
+                                                    Toast.makeText(
+                                                        context,
+                                                        msg,
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    if (success) userViewModel.getUserByID(uid)
+                                                }
+                                            }
+                                        } else {
+                                            isUploadingPhoto = false
+                                            Toast.makeText(
+                                                context,
+                                                "Upload failed",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.outline_photo_library_24),
+                        contentDescription = null,
+                        tint = colorResource(R.color.greenshade),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("Choose from Gallery", color = Color.White, fontFamily = Ruluko)
+                }
+
+                // Camera option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF374151))
+                        .clickable {
+                            showImageSheet = false
+                            onTakePhoto { uri ->
+                                if (uri != null) {
+                                    isUploadingPhoto = true
+                                    cloudinaryViewModel.uploadImage(context, uri) { uploadedUrl ->
+                                        if (uploadedUrl != null) {
+                                            val updatedModel = UserModel(
+                                                id = currentUser?.uid ?: "",
+                                                full_name = userData?.full_name ?: "",
+                                                email = userData?.email ?: "",
+                                                phone = userData?.phone ?: "",
+                                                profilePhotoURL = uploadedUrl,
+                                                role = userData?.role ?: "user"
+                                            )
+                                            currentUser?.uid?.let { uid ->
+                                                userViewModel.editProfile(
+                                                    uid,
+                                                    updatedModel
+                                                ) { success, msg ->
+                                                    isUploadingPhoto = false
+                                                    Toast.makeText(
+                                                        context,
+                                                        msg,
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    if (success) userViewModel.getUserByID(uid)
+                                                }
+                                            }
+                                        } else {
+                                            isUploadingPhoto = false
+                                            Toast.makeText(
+                                                context,
+                                                "Upload failed",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.baseline_camera_alt_24),
+                        contentDescription = null,
+                        tint = colorResource(R.color.greenshade),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("Take a Photo", color = Color.White, fontFamily = Ruluko)
+                }
+
+                Spacer(Modifier.height(8.dp))
+            }
+        }
     }
 
-    // Delete Account Dialog
+    // ─── Delete Account Dialog ────────────────────────────────────────────────
     if (showDeleteDialog) {
         ConfirmDialog(
             title = "Delete Account",
@@ -145,8 +301,8 @@ fun ProfileScreen() {
                             FirebaseAuth.getInstance().currentUser?.delete()
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             val intent = Intent(context, LoginScreen::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            intent.flags =
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             context.startActivity(intent)
                         } else {
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -159,14 +315,12 @@ fun ProfileScreen() {
         )
     }
 
-    // Change Password Dialog
+    // ─── Change Password Dialog ───────────────────────────────────────────────
     if (showChangePasswordDialog) {
         AlertDialog(
             onDismissRequest = { showChangePasswordDialog = false },
             containerColor = Color(0xFF1F2937),
-            title = {
-                Text("Change Password", color = Color.White, fontFamily = Ruluko)
-            },
+            title = { Text("Change Password", color = Color.White, fontFamily = Ruluko) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -202,27 +356,15 @@ fun ProfileScreen() {
                 Button(
                     onClick = {
                         when {
-                            currentPassword.isEmpty() -> {
-                                Toast.makeText(
-                                    context,
-                                    "Please enter current password",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            newPassword.isEmpty() -> {
-                                Toast.makeText(
-                                    context,
-                                    "Please enter new password",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            newPassword != confirmPassword -> {
-                                Toast.makeText(
-                                    context,
-                                    "Passwords do not match",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                            currentPassword.isEmpty() -> Toast.makeText(
+                                context, "Please enter current password", Toast.LENGTH_SHORT
+                            ).show()
+                            newPassword.isEmpty() -> Toast.makeText(
+                                context, "Please enter new password", Toast.LENGTH_SHORT
+                            ).show()
+                            newPassword != confirmPassword -> Toast.makeText(
+                                context, "Passwords do not match", Toast.LENGTH_SHORT
+                            ).show()
                             else -> {
                                 val credential =
                                     com.google.firebase.auth.EmailAuthProvider.getCredential(
@@ -267,9 +409,7 @@ fun ProfileScreen() {
                         contentColor = Color.Black
                     ),
                     shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Update", fontFamily = Ruluko)
-                }
+                ) { Text("Update", fontFamily = Ruluko) }
             },
             dismissButton = {
                 TextButton(onClick = { showChangePasswordDialog = false }) {
@@ -279,13 +419,12 @@ fun ProfileScreen() {
         )
     }
 
+    // ─── Edit Profile Dialog ──────────────────────────────────────────────────
     if (showEditProfileDialog) {
         AlertDialog(
             onDismissRequest = { showEditProfileDialog = false },
             containerColor = Color(0xFF1F2937),
-            title = {
-                Text("Edit Profile", color = Color.White, fontFamily = Ruluko)
-            },
+            title = { Text("Edit Profile", color = Color.White, fontFamily = Ruluko) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -309,28 +448,22 @@ fun ProfileScreen() {
             confirmButton = {
                 Button(
                     onClick = {
-                        when {
-                            editName.isEmpty() -> {
-                                Toast.makeText(
-                                    context,
-                                    "Please enter your name",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            else -> {
-                                val updatedModel = UserModel(
-                                    id = currentUser?.uid ?: "",
-                                    full_name = editName,
-                                    email = userData?.email ?: "",
-                                    phone = editPhone,
-                                    profilePhotoURL = userData?.profilePhotoURL ?: "",
-                                    role = userData?.role ?: "user"
-                                )
-                                currentUser?.uid?.let { uid ->
-                                    userViewModel.editProfile(uid, updatedModel) { success, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                        if (success) showEditProfileDialog = false
-                                    }
+                        if (editName.isEmpty()) {
+                            Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT)
+                                .show()
+                        } else {
+                            val updatedModel = UserModel(
+                                id = currentUser?.uid ?: "",
+                                full_name = editName,
+                                email = userData?.email ?: "",
+                                phone = editPhone,
+                                profilePhotoURL = userData?.profilePhotoURL ?: "",
+                                role = userData?.role ?: "user"
+                            )
+                            currentUser?.uid?.let { uid ->
+                                userViewModel.editProfile(uid, updatedModel) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    if (success) showEditProfileDialog = false
                                 }
                             }
                         }
@@ -340,9 +473,7 @@ fun ProfileScreen() {
                         contentColor = Color.Black
                     ),
                     shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Update", fontFamily = Ruluko)
-                }
+                ) { Text("Update", fontFamily = Ruluko) }
             },
             dismissButton = {
                 TextButton(onClick = { showEditProfileDialog = false }) {
@@ -352,6 +483,7 @@ fun ProfileScreen() {
         )
     }
 
+    // ─── Main content ─────────────────────────────────────────────────────────
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -359,7 +491,7 @@ fun ProfileScreen() {
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
 
-        // Profile Header
+        // ── Profile Header ────────────────────────────────────────────────────
         item {
             Column(
                 modifier = Modifier
@@ -369,9 +501,25 @@ fun ProfileScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Avatar
+                // Avatar with edit overlay
                 Box(contentAlignment = Alignment.BottomEnd) {
-                    if (userData?.profilePhotoURL?.isNotEmpty() == true) {
+                    if (isUploadingPhoto) {
+                        // ✅ Show loading spinner while uploading
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF374151))
+                                .border(2.dp, colorResource(R.color.greenshade), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = colorResource(R.color.greenshade),
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    } else if (userData?.profilePhotoURL?.isNotEmpty() == true) {
                         AsyncImage(
                             model = userData?.profilePhotoURL,
                             contentDescription = null,
@@ -399,18 +547,18 @@ fun ProfileScreen() {
                         }
                     }
 
-                    // Edit icon on avatar
+                    // ✅ Edit icon — opens image bottom sheet
                     Box(
                         modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
                             .background(colorResource(R.color.greenshade))
-                            .clickable { },
+                            .clickable { showImageSheet = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.baseline_edit_24),
-                            contentDescription = "Edit",
+                            contentDescription = "Edit photo",
                             tint = Color.Black,
                             modifier = Modifier.size(14.dp)
                         )
@@ -456,10 +604,8 @@ fun ProfileScreen() {
 
                 Spacer(Modifier.height(4.dp))
 
-                // Action buttons row
-
+                // Edit profile button
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Edit Profile 👈 add first
                     OutlinedButton(
                         onClick = {
                             editName = userData?.full_name ?: ""
@@ -476,18 +622,16 @@ fun ProfileScreen() {
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Edit", fontSize = 12.sp, fontFamily = Ruluko)
+                        Text("Edit Profile", fontSize = 12.sp, fontFamily = Ruluko)
                     }
-
                 }
+
+                // Password + Delete buttons
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Change Password
                     OutlinedButton(
                         onClick = { showChangePasswordDialog = true },
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White
-                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                         modifier = Modifier.height(36.dp)
                     ) {
                         Icon(
@@ -499,7 +643,6 @@ fun ProfileScreen() {
                         Text("Password", fontSize = 12.sp, fontFamily = Ruluko)
                     }
 
-                    // Delete Account
                     OutlinedButton(
                         onClick = { showDeleteDialog = true },
                         shape = RoundedCornerShape(10.dp),
@@ -515,14 +658,13 @@ fun ProfileScreen() {
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Delete", fontSize = 12.sp, fontFamily = Ruluko)
+                        Text("Delete Account", fontSize = 12.sp, fontFamily = Ruluko)
                     }
-
                 }
             }
         }
 
-        // Tabs
+        // ── Tabs: My Reports / My Claims ──────────────────────────────────────
         item {
             Row(
                 modifier = Modifier
@@ -555,10 +697,9 @@ fun ProfileScreen() {
             }
         }
 
-        // My Reports Tab
+        // ── My Reports Tab ────────────────────────────────────────────────────
         if (selectedTab == "reports") {
 
-            // Lost / Found filter
             item {
                 Row(
                     modifier = Modifier
@@ -597,7 +738,6 @@ fun ProfileScreen() {
                 Spacer(Modifier.height(12.dp))
             }
 
-            // Loading indicator
             if (isLoading) {
                 item {
                     Box(
@@ -606,9 +746,7 @@ fun ProfileScreen() {
                             .height(150.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            color = colorResource(R.color.greenshade)
-                        )
+                        CircularProgressIndicator(color = colorResource(R.color.greenshade))
                     }
                 }
             } else {
@@ -654,16 +792,6 @@ fun ProfileScreen() {
                                             ItemDetailActivity::class.java
                                         ).apply {
                                             putExtra("itemId", item.id)
-                                            putExtra("itemName", item.itemName)
-                                            putExtra("description", item.description)
-                                            putExtra("category", item.category)
-                                            putExtra("location", item.location)
-                                            putExtra("date", item.date)
-                                            putExtra("status", item.status)
-                                            putExtra("imageUrl", item.imageUrl)
-                                            putExtra("reporterName", item.reporterName)
-                                            putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
-                                            putExtra("isOwner", true) // always owner in my reports
                                         }
                                         context.startActivity(intent)
                                     }
@@ -676,21 +804,136 @@ fun ProfileScreen() {
             }
         }
 
-        // My Claims Tab — will connect when Claims CRUD is done
+        // ── My Claims Tab ─────────────────────────────────────────────────────
         if (selectedTab == "claims") {
+
+            // ✅ Toggle: Received (on my items) vs Submitted (by me)
             item {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1F2937))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        "Claims coming soon...",
-                        color = Color(0xFF9CA3AF),
-                        fontFamily = Ruluko,
-                        fontSize = 13.sp
-                    )
+                    listOf(
+                        "received" to "Received",
+                        "submitted" to "Submitted"
+                    ).forEach { (key, label) ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (selectedClaimFilter == key)
+                                        colorResource(R.color.greenshade)
+                                    else Color.Transparent
+                                )
+                                .clickable { selectedClaimFilter = key }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selectedClaimFilter == key) Color.Black
+                                else Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                fontFamily = Ruluko
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (isClaimsLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = colorResource(R.color.greenshade))
+                    }
+                }
+            } else if (selectedClaimFilter == "received") {
+
+                //  Claims received on my items
+                val receivedClaims = founderClaims ?: emptyList()
+
+                if (receivedClaims.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No claims received on your items",
+                                color = Color(0xFF9CA3AF),
+                                fontFamily = Ruluko,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                } else {
+                    items(receivedClaims) { claim ->
+                        ClaimCard(
+                            itemName = claim.itemName,
+                            status = claim.status,
+                            date = dateFormatter.format(Date(claim.createdAt)),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            onClick = {
+                                val intent = Intent(context, ItemDetailActivity::class.java).apply {
+                                    putExtra("itemId", claim.itemId)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                }
+
+            } else {
+
+                //  Claims I submitted on others' items
+                val submittedClaims = userClaims ?: emptyList()
+
+                if (submittedClaims.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "You haven't submitted any claims yet",
+                                color = Color(0xFF9CA3AF),
+                                fontFamily = Ruluko,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                } else {
+                    items(submittedClaims) { claim ->
+                        ClaimCard(
+                            itemName = claim.itemName,
+                            status = claim.status,
+                            date = dateFormatter.format(Date(claim.createdAt)),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            onClick = {
+                                val intent = Intent(context, ItemDetailActivity::class.java).apply {
+                                    putExtra("itemId", claim.itemId)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
                 }
             }
         }

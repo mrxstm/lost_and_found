@@ -78,6 +78,7 @@ class ItemDetailActivity : ComponentActivity() {
                 itemId = itemId,
                 claimViewModel = claimViewModel,
                 onBack = { finish() },
+                reportedBy = item?.reportedBy ?: "",
                 onEdit = {
                     val intent = android.content.Intent(
                         this, EditItemActivity::class.java

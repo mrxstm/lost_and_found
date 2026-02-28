@@ -10,7 +10,8 @@ data class ClaimModel(
     val message: String = "",
     val proofImageUrl: String = "",
     val status: String = "pending",     // "pending" | "approved" | "rejected"
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val founderId: String = "",
 ) {
     fun toMap(): Map<String, Any?> {
         return mapOf(
@@ -23,7 +24,8 @@ data class ClaimModel(
             "message" to message,
             "proofImageUrl" to proofImageUrl,
             "status" to status,
-            "createdAt" to createdAt
+            "createdAt" to createdAt,
+            "founderId" to founderId,
         )
     }
 }

@@ -15,6 +15,11 @@ class ClaimViewModel(val repo: ClaimRepo) : ViewModel() {
     val itemClaims: MutableLiveData<List<ClaimModel>?>
         get() = _itemClaims
 
+    //claims received on all items owned by the current user
+    private val _founderClaims = MutableLiveData<List<ClaimModel>?>()
+    val founderClaims: MutableLiveData<List<ClaimModel>?>
+        get() = _founderClaims
+
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: MutableLiveData<Boolean>
         get() = _isLoading
@@ -39,11 +44,8 @@ class ClaimViewModel(val repo: ClaimRepo) : ViewModel() {
         _isLoading.postValue(true)
         repo.getClaimsByUser(userId) { success, msg, data ->
             _isLoading.postValue(false)
-            if (success) {
-                _userClaims.postValue(data)
-            } else {
-                _message.postValue(msg)
-            }
+            if (success) _userClaims.postValue(data)
+            else _message.postValue(msg)
         }
     }
 
@@ -51,11 +53,17 @@ class ClaimViewModel(val repo: ClaimRepo) : ViewModel() {
         _isLoading.postValue(true)
         repo.getClaimsByItem(itemId) { success, msg, data ->
             _isLoading.postValue(false)
-            if (success) {
-                _itemClaims.postValue(data)
-            } else {
-                _message.postValue(msg)
-            }
+            if (success) _itemClaims.postValue(data)
+            else _message.postValue(msg)
+        }
+    }
+
+    fun getClaimsByFounder(founderId: String) {
+        _isLoading.postValue(true)
+        repo.getClaimsByFounder(founderId) { success, msg, data ->
+            _isLoading.postValue(false)
+            if (success) _founderClaims.postValue(data)
+            else _message.postValue(msg)
         }
     }
 
