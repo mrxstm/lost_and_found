@@ -54,16 +54,13 @@ fun HomeScreen() {
     val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    // Observe LiveData
     val allItems by itemViewModel.allItems.observeAsState(emptyList())
     val isLoading by itemViewModel.isLoading.observeAsState(false)
 
-    // Fetch all items when screen loads
     LaunchedEffect(Unit) {
         itemViewModel.getAllItems()
     }
 
-    // Filter lost and found items
     val lostItems = allItems?.filter { it.status == "lost" } ?: emptyList()
     val foundItems = allItems?.filter { it.status == "found" } ?: emptyList()
 
@@ -230,21 +227,12 @@ fun HomeScreen() {
                                 status = item.status,
                                 imageUrl = item.imageUrl,
                                 onClick = {
+                                    // ✅ Only itemId needed — Activity fetches rest from Firebase
                                     val intent = Intent(
                                         context,
                                         ItemDetailActivity::class.java
                                     ).apply {
                                         putExtra("itemId", item.id)
-                                        putExtra("itemName", item.itemName)
-                                        putExtra("description", item.description)
-                                        putExtra("category", item.category)
-                                        putExtra("location", item.location)
-                                        putExtra("date", item.date)
-                                        putExtra("status", item.status)
-                                        putExtra("imageUrl", item.imageUrl)
-                                        putExtra("reporterName", item.reporterName)
-                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
-                                        putExtra("isOwner", item.reportedBy == currentUserId)
                                     }
                                     context.startActivity(intent)
                                 }
@@ -289,16 +277,6 @@ fun HomeScreen() {
                                         ItemDetailActivity::class.java
                                     ).apply {
                                         putExtra("itemId", item.id)
-                                        putExtra("itemName", item.itemName)
-                                        putExtra("description", item.description)
-                                        putExtra("category", item.category)
-                                        putExtra("location", item.location)
-                                        putExtra("date", item.date)
-                                        putExtra("status", item.status)
-                                        putExtra("imageUrl", item.imageUrl)
-                                        putExtra("reporterName", item.reporterName)
-                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
-                                        putExtra("isOwner", item.reportedBy == currentUserId)
                                     }
                                     context.startActivity(intent)
                                 }

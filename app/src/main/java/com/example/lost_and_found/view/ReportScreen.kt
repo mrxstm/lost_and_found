@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -83,6 +85,9 @@ fun ReportScreen(
     prefillCategory: String = "",
     prefillDate: String = "",
     prefillImageUrl: String = "",
+    onBack: () -> Unit = {},
+    showBackButton: Boolean = false,
+
 ) {
     var isUploading by remember { mutableStateOf(false) }
 
@@ -236,13 +241,33 @@ fun ReportScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colorResource(R.color.blackshade))
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .statusBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
 
         // Title
         item {
+            if (showBackButton) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1F2937))
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.back),
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
             Text(
                 if (isEditMode) "Edit Item" else "Report Item",
                 color = Color.White,
@@ -530,7 +555,9 @@ fun ReportScreen(
                                             reporterName = userData?.full_name ?: "",
                                             reporterPhotoUrl = userData?.profilePhotoURL ?: "",
                                             date = selectedDate,
-                                            createdAt = System.currentTimeMillis()
+                                            createdAt = System.currentTimeMillis(),
+                                            reporterEmail = userData?.email ?: "",
+                                            reporterPhone = userData?.phone ?: "",
                                         )
                                         if (isEditMode) {
                                             itemViewModel.updateItem(itemId, item) { success, msg ->
@@ -580,6 +607,8 @@ fun ReportScreen(
                                     reportedBy = currentUser?.uid ?: "",
                                     reporterName = userData?.full_name ?: "",
                                     reporterPhotoUrl = userData?.profilePhotoURL ?: "",
+                                    reporterEmail = userData?.email ?: "",
+                                    reporterPhone = userData?.phone ?: "",
                                     date = selectedDate,
                                     createdAt = System.currentTimeMillis()
                                 )

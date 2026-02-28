@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.lost_and_found.R
+import com.example.lost_and_found.model.UserModel
 import com.example.lost_and_found.repository.ItemRepoImpl
 import com.example.lost_and_found.repository.UserRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
@@ -71,6 +72,9 @@ fun ProfileScreen() {
     val userViewModel = remember { UserViewModel(UserRepoImpl()) }
     val itemViewModel = remember { ItemViewModel(ItemRepoImpl()) }
     val currentUser = FirebaseAuth.getInstance().currentUser
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf("") }
+    var editPhone by remember { mutableStateOf("") }
 
     // Observe LiveData
     val userData by userViewModel.users.observeAsState()
@@ -275,6 +279,79 @@ fun ProfileScreen() {
         )
     }
 
+    if (showEditProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditProfileDialog = false },
+            containerColor = Color(0xFF1F2937),
+            title = {
+                Text("Edit Profile", color = Color.White, fontFamily = Ruluko)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Full Name") },
+                        colors = textFieldColors,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editPhone,
+                        onValueChange = { editPhone = it },
+                        label = { Text("Phone Number") },
+                        colors = textFieldColors,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when {
+                            editName.isEmpty() -> {
+                                Toast.makeText(
+                                    context,
+                                    "Please enter your name",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            else -> {
+                                val updatedModel = UserModel(
+                                    id = currentUser?.uid ?: "",
+                                    full_name = editName,
+                                    email = userData?.email ?: "",
+                                    phone = editPhone,
+                                    profilePhotoURL = userData?.profilePhotoURL ?: "",
+                                    role = userData?.role ?: "user"
+                                )
+                                currentUser?.uid?.let { uid ->
+                                    userViewModel.editProfile(uid, updatedModel) { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        if (success) showEditProfileDialog = false
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.greenshade),
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Update", fontFamily = Ruluko)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfileDialog = false }) {
+                    Text("Cancel", color = Color(0xFF9CA3AF), fontFamily = Ruluko)
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -380,6 +457,29 @@ fun ProfileScreen() {
                 Spacer(Modifier.height(4.dp))
 
                 // Action buttons row
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Edit Profile 👈 add first
+                    OutlinedButton(
+                        onClick = {
+                            editName = userData?.full_name ?: ""
+                            editPhone = userData?.phone ?: ""
+                            showEditProfileDialog = true
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_edit_24),
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit", fontSize = 12.sp, fontFamily = Ruluko)
+                    }
+
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     // Change Password
                     OutlinedButton(

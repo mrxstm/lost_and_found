@@ -35,6 +35,8 @@ class ReportActivity : ComponentActivity() {
         setContent {
             ReportScreen(
                 preSelectedStatus = preSelectedStatus,
+                showBackButton = true,
+                onBack = { finish() },
                 onPickImage = { callback ->
                     onImageSelected = callback
                     imageUtils.launchImagePicker()

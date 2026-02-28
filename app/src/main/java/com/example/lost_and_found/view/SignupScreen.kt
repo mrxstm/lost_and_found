@@ -79,6 +79,7 @@ fun SignupBody() {
     var full_name by remember { mutableStateOf("") }
     var checkbox by remember { mutableStateOf(false) }
     var visibility by remember { mutableStateOf(false) }
+    var phone by remember { mutableStateOf("") }
     val context = LocalContext.current;
     val activity = context as Activity;
     val userViewModel = remember { UserViewModel(UserRepoImpl()) }
@@ -166,6 +167,25 @@ fun SignupBody() {
                         colors = TextFieldDefaults.colors(
 
                         ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .height(48.dp)
+                            .fillMaxWidth()
+                            .padding(end = 12.dp)
+                    )
+
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        "Phone Number",
+                        fontSize = 18.sp,
+                        fontFamily = Ruluko,
+                        color = Color.White,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        colors = TextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .height(48.dp)
@@ -284,7 +304,9 @@ fun SignupBody() {
                                             id = user_id,
                                             full_name = full_name,
                                             email = email,
-                                            password = password
+                                            password = password,
+                                            phone = phone
+
                                         )
                                         userViewModel.addUserToDatabase(user_id, model) {
                                             success,message ->

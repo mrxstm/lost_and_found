@@ -7,6 +7,7 @@ data class UserModel(
     val password : String = "",
     val profilePhotoURL : String = "",
     val role : String = "user",
+    val phone: String = "",
 ) {
 
     //return type of toMap is a Map<String, Any>
@@ -16,6 +17,8 @@ data class UserModel(
             "full_name" to full_name,
             "email" to email,
             "profilePhotoURL" to profilePhotoURL,
+            "phone" to phone,
+            "role" to role
         )
     }
 }
