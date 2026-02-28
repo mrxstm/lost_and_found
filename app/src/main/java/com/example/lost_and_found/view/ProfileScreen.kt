@@ -518,24 +518,6 @@ fun ProfileScreen() {
                         Text("Delete", fontSize = 12.sp, fontFamily = Ruluko)
                     }
 
-                    // Logout
-                    Button(
-                        onClick = { showLogoutDialog = true },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colorResource(R.color.greenshade),
-                            contentColor = Color.Black
-                        ),
-                        modifier = Modifier.height(36.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.outline_logout_24),
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Logout", fontSize = 12.sp, fontFamily = Ruluko)
-                    }
                 }
             }
         }

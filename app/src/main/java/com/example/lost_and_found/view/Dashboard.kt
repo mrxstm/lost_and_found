@@ -1,5 +1,6 @@
 package com.example.lost_and_found.view
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,9 +14,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -30,15 +34,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.lost_and_found.R
+import com.example.lost_and_found.ui.theme.Ruluko
 import com.example.lost_and_found.ui.theme.Sniglet
 import com.example.lost_and_found.utils.ImageUtils
 import com.example.lost_and_found.view.ui.theme.Lost_and_foundTheme
+import com.google.firebase.auth.FirebaseAuth
 
 class Dashboard : ComponentActivity() {
 
@@ -56,7 +64,6 @@ class Dashboard : ComponentActivity() {
             )
         )
 
-        // Initialize ImageUtils here in the Activity
         imageUtils = ImageUtils(this, this)
         imageUtils.registerLaunchers { uri ->
             onImageSelected?.invoke(uri)
@@ -87,7 +94,10 @@ fun DashboardBody(
 ) {
     data class NavItem(val label: String, val icon: Int)
 
+    val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf(0) }
+
+    var showMenu by remember { mutableStateOf(false) }
 
     val listItems = listOf(
         NavItem("Home", R.drawable.home),
@@ -122,17 +132,50 @@ fun DashboardBody(
                     )
                 },
                 actions = {
-                    IconButton(onClick = {}) {
-                        Icon(
-                            painter = painterResource(R.drawable.baseline_notifications_24),
-                            contentDescription = null
-                        )
-                    }
-                    IconButton(onClick = {}) {
-                        Icon(
-                            painter = painterResource(R.drawable.message),
-                            contentDescription = null
-                        )
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                painter = painterResource(R.drawable.outline_menu_24),
+                                contentDescription = "Menu",
+                                tint = Color.White
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            containerColor = Color(0xFF1F2937)
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Logout",
+                                        color = Color(0xFFEF4444),
+                                        fontFamily = Ruluko,
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.outline_logout_24),
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444)
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    FirebaseAuth.getInstance().signOut()
+                                    val intent = Intent(context, LoginScreen::class.java)
+                                    intent.flags =
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    context.startActivity(intent)
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = Color(0xFFEF4444)
+                                )
+                            )
+                        }
                     }
                 }
             )
