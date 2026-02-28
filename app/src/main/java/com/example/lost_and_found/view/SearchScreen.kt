@@ -459,16 +459,6 @@ fun SearchScreen() {
                                         ItemDetailActivity::class.java
                                     ).apply {
                                         putExtra("itemId", item.id)
-                                        putExtra("itemName", item.itemName)
-                                        putExtra("description", item.description)
-                                        putExtra("category", item.category)
-                                        putExtra("location", item.location)
-                                        putExtra("date", item.date)
-                                        putExtra("status", item.status)
-                                        putExtra("imageUrl", item.imageUrl)
-                                        putExtra("reporterName", item.reporterName)
-                                        putExtra("reporterPhotoUrl", item.reporterPhotoUrl)
-                                        putExtra("isOwner", item.reportedBy == currentUserId)
                                     }
                                     context.startActivity(intent)
                                 }
