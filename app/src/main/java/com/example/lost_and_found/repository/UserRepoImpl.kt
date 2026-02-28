@@ -78,6 +78,13 @@ class UserRepoImpl : UserRepo {
         callback: (Boolean, String) -> Unit
     ) {
         ref.child(userId).updateChildren(model.toMap())
+            .addOnCompleteListener {
+                if (it.isSuccessful) {
+                    callback(true, "Profile updated successfully")
+                } else {
+                    callback(false, "${it.exception?.message}")
+                }
+            }
     }
 
     override fun getAllUser(callback: (Boolean, String, List<UserModel>?) -> Unit) {

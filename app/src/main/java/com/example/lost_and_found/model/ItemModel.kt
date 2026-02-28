@@ -13,7 +13,9 @@ data class ItemModel(
     val reporterPhotoUrl: String = "",
     val date: String = "",
     val createdAt: Long = 0L,
-    val isClaimed: Boolean = false
+    val isClaimed: Boolean = false,
+    val reporterEmail: String = "",
+    val reporterPhone: String = "",
 ) {
     fun toMap(): Map<String, Any?> {
         return mapOf(
@@ -29,7 +31,10 @@ data class ItemModel(
             "reporterPhotoUrl" to reporterPhotoUrl,
             "date" to date,
             "createdAt" to createdAt,
-            "isClaimed" to isClaimed
+            "isClaimed" to isClaimed,
+            "reporterEmail" to reporterEmail,
+            "reporterPhone" to reporterPhone
+
         )
     }
 }
