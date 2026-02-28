@@ -220,7 +220,10 @@ fun DashboardBody(
                     onPickImage = onPickImage,
                     onTakePhoto = onTakePhoto
                 )
-                3 -> ProfileScreen()
+                3 -> ProfileScreen(
+                    onPickImage = onPickImage,
+                    onTakePhoto = onTakePhoto
+                )
                 else -> HomeScreen()
             }
         }

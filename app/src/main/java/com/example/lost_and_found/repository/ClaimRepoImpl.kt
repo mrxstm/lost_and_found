@@ -18,6 +18,10 @@ class ClaimRepoImpl : ClaimRepo {
     private var itemClaimsListener: ValueEventListener? = null
     private var itemClaimsRef: DatabaseReference? = null
 
+    //  New listener reference for founder claims
+    private var founderClaimsListener: ValueEventListener? = null
+    private var founderClaimsRef: DatabaseReference? = null
+
     override fun submitClaim(
         claim: ClaimModel,
         callback: (Boolean, String) -> Unit
@@ -39,7 +43,6 @@ class ClaimRepoImpl : ClaimRepo {
         userId: String,
         callback: (Boolean, String, List<ClaimModel>?) -> Unit
     ) {
-        // ✅ Remove previous listener before attaching a new one
         userClaimsListener?.let { userClaimsRef?.removeEventListener(it) }
 
         val query = ref.orderByChild("claimantId").equalTo(userId)
@@ -96,6 +99,37 @@ class ClaimRepoImpl : ClaimRepo {
         query.addValueEventListener(listener)
     }
 
+    //  New — real-time listener for all claims on founder's items
+    override fun getClaimsByFounder(
+        founderId: String,
+        callback: (Boolean, String, List<ClaimModel>?) -> Unit
+    ) {
+        founderClaimsListener?.let { founderClaimsRef?.removeEventListener(it) }
+
+        val query = ref.orderByChild("founderId").equalTo(founderId)
+
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val claims = mutableListOf<ClaimModel>()
+                if (snapshot.exists()) {
+                    for (data in snapshot.children) {
+                        val claim = data.getValue(ClaimModel::class.java)
+                        if (claim != null) claims.add(claim)
+                    }
+                }
+                callback(true, "Claims fetched", claims)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                callback(false, error.message, null)
+            }
+        }
+
+        founderClaimsListener = listener
+        founderClaimsRef = ref
+        query.addValueEventListener(listener)
+    }
+
     override fun updateClaimStatus(
         claimId: String,
         status: String,
@@ -118,7 +152,6 @@ class ClaimRepoImpl : ClaimRepo {
                                         val id = data.key ?: continue
                                         val claimStatus = data.child("status")
                                             .getValue(String::class.java)
-                                        // Reject all others that are still pending
                                         if (id != claimId && claimStatus == "pending") {
                                             updates["$id/status"] = "rejected"
                                         }
@@ -128,21 +161,16 @@ class ClaimRepoImpl : ClaimRepo {
                                             .addOnSuccessListener {
                                                 callback(true, "Claim approved")
                                             }
-                                            .addOnFailureListener { e ->
-                                                // Approval succeeded, auto-reject failed — still report success
+                                            .addOnFailureListener {
                                                 callback(true, "Claim approved")
                                             }
                                     } else {
                                         callback(true, "Claim approved")
                                     }
                                 }
-                                .addOnFailureListener {
-                                    callback(true, "Claim approved")
-                                }
+                                .addOnFailureListener { callback(true, "Claim approved") }
                         }
-                        .addOnFailureListener {
-                            callback(true, "Claim approved")
-                        }
+                        .addOnFailureListener { callback(true, "Claim approved") }
                 } else {
                     callback(true, "Claim status updated")
                 }
@@ -169,9 +197,12 @@ class ClaimRepoImpl : ClaimRepo {
     override fun removeListeners() {
         userClaimsListener?.let { userClaimsRef?.removeEventListener(it) }
         itemClaimsListener?.let { itemClaimsRef?.removeEventListener(it) }
+        founderClaimsListener?.let { founderClaimsRef?.removeEventListener(it) }
         userClaimsListener = null
         itemClaimsListener = null
+        founderClaimsListener = null
         userClaimsRef = null
         itemClaimsRef = null
+        founderClaimsRef = null
     }
 }

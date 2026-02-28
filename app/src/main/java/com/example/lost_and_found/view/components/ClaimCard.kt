@@ -1,6 +1,7 @@
 package com.example.lost_and_found.view.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,8 @@ fun ClaimCard(
     itemName: String,
     status: String,
     date: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val statusColor = when (status.lowercase()) {
         "approved" -> Color(0xFF22C55E)
@@ -50,6 +52,7 @@ fun ClaimCard(
             .padding(vertical = 6.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(Color(0xFF1F2937))
+            .clickable { onClick() }
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically

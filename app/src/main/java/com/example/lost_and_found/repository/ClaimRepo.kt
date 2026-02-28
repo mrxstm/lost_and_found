@@ -33,4 +33,8 @@ interface ClaimRepo {
     fun removeListeners()
 
 
+    fun getClaimsByFounder(
+        founderId: String,
+        callback: (Boolean, String, List<ClaimModel>?) -> Unit
+    )
 }
