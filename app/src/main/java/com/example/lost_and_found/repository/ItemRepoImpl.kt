@@ -143,13 +143,63 @@ class ItemRepoImpl : ItemRepo {
         itemId: String,
         callback: (Boolean, String) -> Unit
     ) {
-        ref.child(itemId).removeValue()
-            .addOnCompleteListener {
-                if (it.isSuccessful) {
-                    callback(true, "Item deleted successfully")
-                } else {
-                    callback(false, "${it.exception?.message}")
+        //  Find all claims for this item
+        val claimsRef = database.getReference("Claims")
+
+        claimsRef.orderByChild("itemId").equalTo(itemId).get()
+            .addOnSuccessListener { snapshot ->
+
+                //  Build batch delete for all related claims
+                val updates = mutableMapOf<String, Any?>()
+                if (snapshot.exists()) {
+                    for (data in snapshot.children) {
+                        val claimId = data.key ?: continue
+                        updates[claimId] = null  // null = delete in Firebase
+                    }
                 }
+
+                //  Delete all claims in one batch write
+                val deleteClaims = {
+                    if (updates.isNotEmpty()) {
+                        claimsRef.updateChildren(updates)
+                            .addOnSuccessListener {
+                                // Delete the item itself
+                                ref.child(itemId).removeValue()
+                                    .addOnCompleteListener {
+                                        if (it.isSuccessful) {
+                                            callback(true, "Item deleted successfully")
+                                        } else {
+                                            callback(false, "${it.exception?.message}")
+                                        }
+                                    }
+                            }
+                            .addOnFailureListener { e ->
+                                callback(false, "${e.message}")
+                            }
+                    } else {
+                        // No claims to delete — just delete the item
+                        ref.child(itemId).removeValue()
+                            .addOnCompleteListener {
+                                if (it.isSuccessful) {
+                                    callback(true, "Item deleted successfully")
+                                } else {
+                                    callback(false, "${it.exception?.message}")
+                                }
+                            }
+                    }
+                }
+
+                deleteClaims()
+            }
+            .addOnFailureListener { e ->
+                ref.child(itemId).removeValue()
+                    .addOnCompleteListener {
+                        if (it.isSuccessful) {
+                            callback(true, "Item deleted successfully")
+                        } else {
+                            callback(false, "${it.exception?.message}")
+                        }
+                    }
             }
     }
 }

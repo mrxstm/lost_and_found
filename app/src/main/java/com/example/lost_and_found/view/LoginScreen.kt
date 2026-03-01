@@ -45,8 +45,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,19 +54,17 @@ import androidx.core.content.ContextCompat
 import com.example.lost_and_found.R
 import com.example.lost_and_found.repository.UserRepoImpl
 import com.example.lost_and_found.ui.theme.Ruluko
-import com.example.lost_and_found.ui.theme.Sniglet
 import com.example.lost_and_found.viewmodel.UserViewModel
 
 class LoginScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(ContextCompat.getColor(this,R.color.blackshade)),
+            statusBarStyle = SystemBarStyle.dark(ContextCompat.getColor(this, R.color.blackshade)),
             navigationBarStyle = SystemBarStyle.dark(ContextCompat.getColor(this, R.color.blackshade))
         )
         setContent {
-               LoginBody()
-
+            LoginBody()
         }
     }
 }
@@ -76,17 +72,18 @@ class LoginScreen : ComponentActivity() {
 @Composable
 fun LoginBody() {
 
-    var userViewModel = remember { UserViewModel(UserRepoImpl()) }
+    val userViewModel = remember { UserViewModel(UserRepoImpl()) }
 
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("")}
+    var password by remember { mutableStateOf("") }
     var checked by remember { mutableStateOf(false) }
     var visibility by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current;
-    val activity = context as Activity;
+    val context = LocalContext.current
+    val activity = context as Activity
+
     Scaffold { padding ->
-        LazyColumn (
+        LazyColumn(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(padding)
@@ -113,7 +110,7 @@ fun LoginBody() {
                         .padding(start = 20.dp, top = 35.dp)
                 ) {
 
-                    //Email
+                    // Email
                     Text(
                         "Email",
                         fontSize = 18.sp,
@@ -121,16 +118,13 @@ fun LoginBody() {
                         color = Color.White,
                     )
                     Spacer(Modifier.height(12.dp))
-
                     OutlinedTextField(
                         value = email,
-                        onValueChange = {email = it},
+                        onValueChange = { email = it },
                         placeholder = {
                             Text("abc@gmail.com", fontSize = 12.sp)
                         },
-                        colors = TextFieldDefaults.colors(
-
-                        ),
+                        colors = TextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .height(50.dp)
@@ -140,8 +134,7 @@ fun LoginBody() {
 
                     Spacer(Modifier.height(20.dp))
 
-                    //Password
-
+                    // Password
                     Text(
                         "Password",
                         fontSize = 18.sp,
@@ -149,24 +142,18 @@ fun LoginBody() {
                         color = Color.White,
                     )
                     Spacer(Modifier.height(12.dp))
-
                     OutlinedTextField(
                         value = password,
-                        onValueChange = {password = it},
-                        placeholder = {
-                            Text("******")
-                        },
-                        colors = TextFieldDefaults.colors(
-
-                        ),
-                        visualTransformation = if(visibility) VisualTransformation.None else PasswordVisualTransformation(),
+                        onValueChange = { password = it },
+                        placeholder = { Text("******") },
+                        colors = TextFieldDefaults.colors(),
+                        visualTransformation = if (visibility) VisualTransformation.None
+                        else PasswordVisualTransformation(),
                         shape = RoundedCornerShape(12.dp),
                         trailingIcon = {
-                            IconButton(onClick = {
-                                visibility = !visibility
-                            }) {
+                            IconButton(onClick = { visibility = !visibility }) {
                                 Icon(
-                                    painter = if(visibility)
+                                    painter = if (visibility)
                                         painterResource(R.drawable.baseline_visibility_24)
                                     else painterResource(R.drawable.baseline_visibility_off_24),
                                     contentDescription = null
@@ -178,39 +165,89 @@ fun LoginBody() {
                             .fillMaxWidth()
                             .padding(end = 12.dp)
                     )
+
                     Spacer(Modifier.height(18.dp))
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier
-                            .padding(start = 20.dp)
                             .fillMaxWidth()
+                            .padding(end = 12.dp)
                     ) {
-                        Spacer(Modifier.width(60.dp))
+                        // Remember me
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { checked = it },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = colorResource(R.color.greenshade),
+                                    uncheckedColor = Color.White
+                                )
+                            )
+                            Text(
+                                "Remember me",
+                                color = Color.White,
+                                fontFamily = Ruluko,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        // Forgot password
                         Text(
-                            "forgot password?",
+                            "Forgot password?",
                             fontFamily = Ruluko,
+                            fontSize = 13.sp,
                             color = colorResource(R.color.blueshade),
-                            modifier = Modifier
-                                .padding(end = 12.dp)
-                                .clickable(onClick = {
-                                    val intent = Intent(context, ForgetPassword::class.java)
-                                    activity.startActivity(intent)
-                                })
+                            modifier = Modifier.clickable {
+                                val intent = Intent(context, ForgetPassword::class.java)
+                                activity.startActivity(intent)
+                            }
                         )
                     }
+
                     Spacer(Modifier.height(20.dp))
+
+                    // Login button
                     Button(
                         onClick = {
-                            userViewModel.login(email, password) {
-                                success, message ->
-                                if(success) {
-                                    val intent = Intent(context, Dashboard::class.java)
-                                    context.startActivity(intent)
+                            when {
+                                email.isEmpty() -> {
+                                    Toast.makeText(
+                                        context,
+                                        "Please enter your email",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                password.isEmpty() -> {
+                                    Toast.makeText(
+                                        context,
+                                        "Please enter your password",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                else -> {
+                                    userViewModel.login(email, password) { success, message ->
+                                        if (success) {
+                                            //  Save remember me preference
+                                            val prefs = context.getSharedPreferences(
+                                                "lost_and_found_prefs",
+                                                android.content.Context.MODE_PRIVATE
+                                            )
+                                            prefs.edit()
+                                                .putBoolean("rememberMe", checked)
+                                                .apply()
 
-                                    activity.finish()
-                                } else {
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                            val intent = Intent(context, Dashboard::class.java)
+                                            context.startActivity(intent)
+                                            activity.finish()
+                                        } else {
+                                            Toast.makeText(context, message, Toast.LENGTH_SHORT)
+                                                .show()
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -223,8 +260,7 @@ fun LoginBody() {
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-
-                        Text("Login")
+                        Text("Login", fontFamily = Ruluko)
                     }
 
                     Spacer(Modifier.height(30.dp))
@@ -235,46 +271,41 @@ fun LoginBody() {
                             .fillMaxWidth()
                             .padding(horizontal = 15.dp)
                     ) {
-                        HorizontalDivider(
-                            modifier = Modifier.weight(1f)
-                        )
+                        HorizontalDivider(modifier = Modifier.weight(1f))
                         Text(
                             "or",
                             color = colorResource(R.color.greyshade),
                             modifier = Modifier.padding(horizontal = 15.dp)
                         )
-                        HorizontalDivider(
-                            modifier = Modifier.weight(1f)
-                        )
+                        HorizontalDivider(modifier = Modifier.weight(1f))
                     }
 
                     Spacer(Modifier.height(30.dp))
 
-                    Row (
+                    Row(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Don't have an account ?", color = colorResource(R.color.greyshade))
+                        Text(
+                            "Don't have an account?",
+                            color = colorResource(R.color.greyshade)
+                        )
                         Text(
                             " Sign up",
-                            modifier = Modifier.clickable(onClick = {
+                            modifier = Modifier.clickable {
                                 val intent = Intent(context, SignupScreen::class.java)
                                 context.startActivity(intent)
-                            }),
+                            },
                             color = colorResource(R.color.blueshade)
                         )
                     }
 
-
-
+                    Spacer(Modifier.height(30.dp))
                 }
             }
-            
         }
-
     }
-
 }
 
 @Preview(showBackground = true)
