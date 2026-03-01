@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -150,6 +152,7 @@ fun SignupBody() {
                             .height(48.dp)
                             .fillMaxWidth()
                             .padding(end = 12.dp)
+                            .semantics {testTag = "fullName"}
                     )
 
                     Spacer(Modifier.height(20.dp))
@@ -172,6 +175,7 @@ fun SignupBody() {
                             .height(48.dp)
                             .fillMaxWidth()
                             .padding(end = 12.dp)
+                            .semantics {testTag = "email"}
                     )
 
                     Spacer(Modifier.height(20.dp))
@@ -191,6 +195,7 @@ fun SignupBody() {
                             .height(48.dp)
                             .fillMaxWidth()
                             .padding(end = 12.dp)
+                            .semantics{testTag = "phone"}
                     )
 
                     Spacer(Modifier.height(20.dp))
@@ -227,6 +232,7 @@ fun SignupBody() {
                             .fillMaxWidth()
                             .height(48.dp)
                             .padding(end = 12.dp)
+                            .semantics {testTag = "password"}
                     )
                     Spacer(Modifier.height(20.dp))
 
@@ -286,7 +292,8 @@ fun SignupBody() {
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = colorResource(R.color.greenshade),
                                     uncheckedColor = Color.White
-                                )
+                                ),
+                                modifier = Modifier.semantics { testTag = "termsCheckbox" }
 
                             )
                         }
@@ -312,6 +319,10 @@ fun SignupBody() {
                                             success,message ->
                                             if(success) {
                                                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                                val intent = Intent(context, Dashboard::class.java)
+                                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                                context.startActivity(intent)
+
                                             } else {
                                                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                                             }
@@ -326,6 +337,7 @@ fun SignupBody() {
                             .fillMaxWidth()
                             .padding(end = 12.dp)
                             .height(40.dp)
+                            .semantics {testTag = "signupButton"}
                         ,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colorResource(R.color.greenshade),
