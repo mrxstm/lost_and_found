@@ -29,7 +29,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".MainActivity" android:exported="false" />
         <activity android:name=".view.LoginScreen" android:exported="false" />
         <activity android:name=".view.SignupScreen" android:exported="false" />
         <activity android:name=".view.ForgetPassword" android:exported="false" />
