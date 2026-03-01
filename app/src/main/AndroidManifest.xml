@@ -34,10 +34,10 @@
         <activity android:name=".view.SignupScreen" android:exported="false" />
         <activity android:name=".view.ForgetPassword" android:exported="false" />
         <activity android:name=".view.Dashboard" android:exported="false" />
-        <activity android:name=".view.dashboard.components.BottomBar" android:exported="false" />
         <activity android:name=".view.ItemDetailActivity" android:exported="false" />
         <activity android:name=".view.ReportActivity" android:exported="false" />
         <activity android:name=".view.EditItemActivity" android:exported="false"/>
+
 
         <provider
             android:name="androidx.core.content.FileProvider"
