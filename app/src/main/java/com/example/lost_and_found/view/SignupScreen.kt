@@ -349,7 +349,7 @@ fun SignupBody() {
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            "or sign up with",
+                            "or",
                             color = colorResource(R.color.greyshade),
                             modifier = Modifier.padding(horizontal = 15.dp)
                         )
@@ -358,35 +358,7 @@ fun SignupBody() {
                         )
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 12.dp)
-                            .height(40.dp)
-                        ,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row (
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.google),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = Color.Unspecified
-                            )
-                            Spacer(Modifier.width(12.dp).height(40.dp))
-                            Text("Google", color = Color.Black)
 
-                        }
-
-                    }
                     Spacer(Modifier.height(20.dp))
 
                     Row (

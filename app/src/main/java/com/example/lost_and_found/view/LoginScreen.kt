@@ -186,24 +186,6 @@ fun LoginBody() {
                             .padding(start = 20.dp)
                             .fillMaxWidth()
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "remember me",
-                                color = Color.White,
-                                fontFamily = Ruluko
-                            )
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = {checked = it},
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = colorResource(R.color.greenshade),
-                                    uncheckedColor = Color.White
-                                )
-
-                            )
-                        }
                         Spacer(Modifier.width(60.dp))
                         Text(
                             "forgot password?",
@@ -257,7 +239,7 @@ fun LoginBody() {
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            "or sign in with",
+                            "or",
                             color = colorResource(R.color.greyshade),
                             modifier = Modifier.padding(horizontal = 15.dp)
                         )
@@ -266,33 +248,6 @@ fun LoginBody() {
                         )
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row (
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.google),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = Color.Unspecified
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("Google", color = Color.Black)
-
-                        }
-
-                    }
                     Spacer(Modifier.height(30.dp))
 
                     Row (
