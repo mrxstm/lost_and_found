@@ -89,7 +89,7 @@ fun ProfileScreen(
     val cloudinaryViewModel = remember { CloudinaryViewModel(CloudinaryRepoImpl()) }
     val currentUser = FirebaseAuth.getInstance().currentUser
 
-    // ─── Observe LiveData ─────────────────────────────────────────────────────
+    //  Observe LiveData
     val userData by userViewModel.users.observeAsState()
     val userItems by itemViewModel.userItems.observeAsState(emptyList())
     val isLoading by itemViewModel.isLoading.observeAsState(false)
@@ -97,7 +97,7 @@ fun ProfileScreen(
     val founderClaims by claimViewModel.founderClaims.observeAsState(emptyList())
     val isClaimsLoading by claimViewModel.isLoading.observeAsState(false)
 
-    // ─── Fetch data ───────────────────────────────────────────────────────────
+    //  Fetch data
     LaunchedEffect(Unit) {
         currentUser?.uid?.let { uid ->
             userViewModel.getUserByID(uid)
@@ -107,7 +107,7 @@ fun ProfileScreen(
         }
     }
 
-    // ─── UI states ────────────────────────────────────────────────────────────
+    //UI states
     var selectedTab by remember { mutableStateOf("reports") }
     var selectedReportFilter by remember { mutableStateOf("lost") }
     var selectedClaimFilter by remember { mutableStateOf("received") }
@@ -138,10 +138,10 @@ fun ProfileScreen(
         unfocusedLabelColor = Color(0xFF9CA3AF),
     )
 
-    // ─── Date formatter ───────────────────────────────────────────────────────
+    //Date formatter
     val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // ─── Profile picture bottom sheet ─────────────────────────────────────────
+    //Profile picture bottom sheet
     if (showImageSheet) {
         ModalBottomSheet(
             onDismissRequest = { showImageSheet = false },
@@ -287,7 +287,7 @@ fun ProfileScreen(
         }
     }
 
-    // ─── Delete Account Dialog ────────────────────────────────────────────────
+    // Delete Account Dialog
     if (showDeleteDialog) {
         ConfirmDialog(
             title = "Delete Account",
@@ -315,7 +315,7 @@ fun ProfileScreen(
         )
     }
 
-    // ─── Change Password Dialog ───────────────────────────────────────────────
+    //Change Password Dialog
     if (showChangePasswordDialog) {
         AlertDialog(
             onDismissRequest = { showChangePasswordDialog = false },
@@ -419,7 +419,7 @@ fun ProfileScreen(
         )
     }
 
-    // ─── Edit Profile Dialog ──────────────────────────────────────────────────
+    // Edit Profile Dialog
     if (showEditProfileDialog) {
         AlertDialog(
             onDismissRequest = { showEditProfileDialog = false },
@@ -483,7 +483,7 @@ fun ProfileScreen(
         )
     }
 
-    // ─── Main content ─────────────────────────────────────────────────────────
+    //Main content
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -491,7 +491,7 @@ fun ProfileScreen(
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
 
-        // ── Profile Header ────────────────────────────────────────────────────
+        // Profile Header
         item {
             Column(
                 modifier = Modifier
@@ -504,7 +504,6 @@ fun ProfileScreen(
                 // Avatar with edit overlay
                 Box(contentAlignment = Alignment.BottomEnd) {
                     if (isUploadingPhoto) {
-                        // ✅ Show loading spinner while uploading
                         Box(
                             modifier = Modifier
                                 .size(90.dp)
@@ -547,7 +546,7 @@ fun ProfileScreen(
                         }
                     }
 
-                    // ✅ Edit icon — opens image bottom sheet
+                    // Edit icon — opens image bottom sheet
                     Box(
                         modifier = Modifier
                             .size(26.dp)
@@ -664,7 +663,7 @@ fun ProfileScreen(
             }
         }
 
-        // ── Tabs: My Reports / My Claims ──────────────────────────────────────
+        //Tabs: My Reports / My Claims
         item {
             Row(
                 modifier = Modifier
@@ -697,7 +696,7 @@ fun ProfileScreen(
             }
         }
 
-        // ── My Reports Tab ────────────────────────────────────────────────────
+        // My Reports Tab
         if (selectedTab == "reports") {
 
             item {
@@ -804,10 +803,10 @@ fun ProfileScreen(
             }
         }
 
-        // ── My Claims Tab ─────────────────────────────────────────────────────
+        // My Claims Tab
         if (selectedTab == "claims") {
 
-            // ✅ Toggle: Received (on my items) vs Submitted (by me)
+            // Toggle: Received (on my items) vs Submitted (by me)
             item {
                 Row(
                     modifier = Modifier
